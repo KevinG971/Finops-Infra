@@ -81,9 +81,9 @@ jobs:
     # Github Ref
     #================================== 
     - run: | 
-        echo "GitHub Target Branch = ${{ needs.set-env.outputs.target_branch }}"
-        echo "GitHub Base Ref = ${{ github.event.pull_request.base.ref }}"
-        echo "GitHub Head Ref = ${{ github.event.pull_request.head.ref }}"
+#        echo "GitHub Target Branch = ${{ needs.set-env.outputs.target_branch }}"
+#        echo "GitHub Base Ref = ${{ github.event.pull_request.base.ref }}"
+#        echo "GitHub Head Ref = ${{ github.event.pull_request.head.ref }}"
         echo "GitHub Ref = ${{ github.ref }}"
     
     #==================================
@@ -91,8 +91,8 @@ jobs:
     #================================== 
     - name: checkout repo
       uses: actions/checkout@v2
-      with:
-        ref: ${{ github.ref }}
+#      with:
+#        ref: ${{ github.ref }}
 
 
     #==================================
