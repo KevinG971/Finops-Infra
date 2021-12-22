@@ -46,7 +46,7 @@ jobs:
           fi
         env:
           DEPLOY_ON_DEV: ${{ github.ref == 'refs/heads/develop' && github.event.pull_request.merged == true }}
-          DEPLOY_ON_TEST: ${{ github.ref == 'refs/heads/qa' && github.event.pull_request.merged == true }}
+          DEPLOY_ON_TEST: ${{ github.ref == 'refs/heads/test'}}
           DEPLOY_ON_PROD: ${{ github.ref == 'refs/heads/main' && github.event.pull_request.merged == true }}
           
   #====================================================================================================================================
@@ -91,8 +91,6 @@ jobs:
     #================================== 
     - name: checkout repo
       uses: actions/checkout@v2
-      with:
-        ref: ${{ github.ref }}
 
 
     #==================================
