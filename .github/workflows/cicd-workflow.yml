@@ -1,0 +1,140 @@
+name: 'FinOps Workflow Test'
+ 
+on:
+  workflow_dispatch:
+  pull_request_target:
+    branches: 
+      - develop
+      - main
+    types: [closed]
+  release:
+    types: [published, released]
+
+
+jobs:
+  #====================================================================================================================================
+  # Set Environment
+  #====================================================================================================================================
+  set-env:
+    runs-on: ubuntu-latest
+    outputs:
+      env: ${{ steps.set-target-env.outputs.env }}
+      env_code: ${{ steps.set-target-env.outputs.env_code }}
+
+    steps:
+      #==================================
+      # Set Target Environment
+      #==================================
+      - name: 'Set target environment'
+        id: set-target-env
+        run: |
+          ENV="test"
+          [ "$DEPLOY_ON_DEV" == true ] && ENV=dev
+          [ "$DEPLOY_ON_TEST" == true ] && ENV=test
+          [ "$DEPLOY_ON_PROD" == true ] && ENV=prod
+          ENV_CODE="t"
+          [ "$DEPLOY_ON_DEV" == true ] && ENV_CODE=d
+          [ "$DEPLOY_ON_TEST" == true ] && ENV_CODE=t
+          [ "$DEPLOY_ON_PROD" == true ] && ENV_CODE=p
+          echo "::set-output name=env::$ENV"
+          echo "::set-output name=env_code::$ENV_CODE"
+          echo "ENV is '$ENV'"
+          echo "ENV_CODE is '$ENV_CODE'"
+          if [ -z "$ENV" ]; then
+            echo "::error ::Couldn't set the target environment ... Abort."
+            exit 1
+          fi
+        env:
+          DEPLOY_ON_DEV: ${{ github.ref == 'refs/heads/develop' && github.event.pull_request.merged == true }}
+          DEPLOY_ON_TEST: ${{ github.ref == 'refs/heads/qa' && github.event.pull_request.merged == true }}
+          DEPLOY_ON_PROD: ${{ github.ref == 'refs/heads/main' && github.event.pull_request.merged == true }}
+          
+  #====================================================================================================================================
+  # Terraform 
+  #====================================================================================================================================
+  terraform:
+    name: 'Terraform Build & Deploy'
+    
+    runs-on: ubuntu-latest
+    needs:
+      - set-env
+    environment: ${{ needs.set-env.outputs.env }}
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_RESOURCE_GROUP_NAME: RG-KEVIN-LAB #rg-ias${{ needs.set-env.outputs.env_code }}-euw-lz-finops
+      TF_VAR_STORAGE_ACCOUNT_NAME: azstakev #azstiaspciss${{ needs.set-env.outputs.env_code }}
+      TF_VAR_CONTAINER_NAME: finopstestinfra #azctiaspciss${{ needs.set-env.outputs.env_code }}
+      TF_VAR_KEY: ${{ needs.set-env.outputs.env }}.terraform.tfstate #ciss-${{ needs.set-env.outputs.env }}.terraform.tfstate
+      TF_VERSION: 0.14.9
+ 
+    defaults:
+      run:
+        shell: bash
+        
+    steps:
+    
+    #==================================
+    # Github Ref
+    #================================== 
+    - run: | 
+        echo "GitHub Target Branch = ${{ needs.set-env.outputs.target_branch }}"
+        echo "GitHub Base Ref = ${{ github.event.pull_request.base.ref }}"
+        echo "GitHub Head Ref = ${{ github.event.pull_request.head.ref }}"
+        echo "GitHub Ref = ${{ github.ref }}"
+    
+    #==================================
+    # Checkout Repository
+    #================================== 
+    - name: checkout repo
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+
+
+    #==================================
+    # Terraform Init
+    #==================================  
+    - name: 'Terraform Init'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: ${{ env.TF_VERSION }}
+        tf_actions_subcommand: 'init'
+        tf_actions_working_dir: "./Infrastructure/Terraform"
+        args: '-var-file="./Infrastructure/Environments/${{ needs.set-env.outputs.env }}.tfvars " -backend-config="resource_group_name=${{ env.TF_VAR_RESOURCE_GROUP_NAME }}" -backend-config="storage_account_name=${{ env.TF_VAR_STORAGE_ACCOUNT_NAME }}" -backend-config="container_name=${{ env.TF_VAR_CONTAINER_NAME }}" -backend-config="key=${{ env.TF_VAR_KEY }}"'
+    
+    #==================================
+    # Terraform Validate
+    #================================== 
+    - name: 'Terraform Validate'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: ${{ env.TF_VERSION }}
+        tf_actions_subcommand: 'validate'
+        tf_actions_working_dir: "./Infrastructure/Terraform"
+        args: -var-file="./Infrastructure/Environment/${{ needs.set-env.outputs.env }}.tfvars"
+    
+    #==================================
+    # Terraform Plan
+    #================================== 
+    - name: 'Terraform Plan'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: ${{ env.TF_VERSION }}
+        tf_actions_subcommand: 'plan'
+        tf_actions_working_dir: "./Infrastructure/Terraform"
+        args: -var-file="./Infrastructure/Environment/${{ needs.set-env.outputs.env }}.tfvars"
+    
+    #==================================
+    # Terraform Apply
+    #==================================
+    - name: 'Terraform Apply'
+      uses: hashicorp/terraform-github-actions@master
+      with:
+        tf_actions_version: ${{ env.TF_VERSION }}
+        tf_actions_subcommand: 'apply'
+        tf_actions_working_dir: "./Infrastructure/Terraform"
+        args: -var-file="./Infrastructure/Environment/${{ needs.set-env.outputs.env }}.tfvars"        
