@@ -28,11 +28,11 @@ jobs:
       - name: 'Set target environment'
         id: set-target-env
         run: |
-          ENV="dev"
+          ENV=""
           [ "$DEPLOY_ON_DEV" == true ] && ENV=dev
           [ "$DEPLOY_ON_TEST" == true ] && ENV=test
           [ "$DEPLOY_ON_PROD" == true ] && ENV=prod
-          ENV_CODE="d"
+          ENV_CODE=""
           [ "$DEPLOY_ON_DEV" == true ] && ENV_CODE=d
           [ "$DEPLOY_ON_TEST" == true ] && ENV_CODE=t
           [ "$DEPLOY_ON_PROD" == true ] && ENV_CODE=p
